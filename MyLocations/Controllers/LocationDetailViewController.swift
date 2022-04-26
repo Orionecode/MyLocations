@@ -25,6 +25,7 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
     var date = Date()
     var descriptionText = ""
     var addressText = ""
+    var image: UIImage?
 
     // 数据库中已有 进入Edit界面传参数据库对象
     var managedObjectContext: NSManagedObjectContext!
@@ -47,7 +48,12 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
     @IBOutlet weak var latitudeTextField: UITextField!
     @IBOutlet weak var longitudeTextField: UITextField!
     @IBOutlet weak var dateLabel: UILabel!
-
+    @IBOutlet weak var addPhotoLabel: UILabel!
+    @IBOutlet weak var imageView: UIImageView!
+    @IBOutlet weak var imageHeight: NSLayoutConstraint!
+    @IBOutlet weak var imageViewTopPadding: NSLayoutConstraint!
+    @IBOutlet weak var imageViewBottomPadding: NSLayoutConstraint!
+    
     // MARK: - Actions
     @IBAction func done(_ sender: Any) {
         // 设计显示HUD
@@ -67,8 +73,9 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
             hudView.text = "Tagged"
             // 声明一个新的被managedObjectContext管理的Location对象
             location = Location(context: managedObjectContext)
+            location.photoID = nil
         }
-        
+
         // 赋值
         location.locationDescription = descriptionTextView.text
         location.category = categoryName
@@ -85,6 +92,20 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
             location.longitude = coordinate.longitude
         }
         
+        // 保存图片
+        if let image = image {
+            if !location.hasPhoto {
+                location.photoID = Location.nextPhotoID() as NSNumber
+            }
+            if let data = image.jpegData(compressionQuality: 0.5) {
+                do {
+                    try data.write(to: location.photoURL, options: .atomic)
+                } catch {
+                    print("Error writing file: \(error)")
+                }
+            }
+        }
+
         // 在数据库中保存
         do {
             try managedObjectContext.save()
@@ -113,8 +134,13 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        if locationToEdit != nil {
+        if let location = locationToEdit {
             title = "Edit Location"
+            if location.hasPhoto {
+                if let theImage = location.photoImage {
+                    show(image: theImage)
+                }
+            }
         }
         // 将存储在数据库的内容解析到界面
         descriptionTextView.text = descriptionText
@@ -130,7 +156,7 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
     }
 
     // MARK: - UITextFieldDelegate Methods
-    
+
     // Allow just decimal number
     // Connect delegate in interface builder!
     func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
@@ -140,17 +166,99 @@ class LocationDetailViewController: UITableViewController, UITextFieldDelegate {
         }
         return true
     }
-    
-    // MARK: - Helper Methods
+
+    // MARK: - Table View Delegates
+    override func tableView(
+        _ tableView: UITableView,
+        didSelectRowAt indexPath: IndexPath
+    ) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        if indexPath.section == 1 && indexPath.row == 0 {
+            tableView.deselectRow(at: indexPath, animated: true)
+            pickePhoto()
+        }
+    }
+
+// MARK: - Helper Methods
     func format(date: Date) -> String {
         return dateFormatter.string(from: date)
     }
+    
+    func show(image: UIImage) {
+        imageView.image = image
+        imageView.isHidden = false
+        addPhotoLabel.text = ""
+        imageHeight.constant = 300
+        imageViewTopPadding.constant = 18
+        imageViewBottomPadding.constant = 18
+        tableView.reloadData()
+    }
+    
 
-    // MARK: - Navigation
+// MARK: - Navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "PickCategory" {
             let controller = segue.destination as! CategoryPickerViewController
             controller.selectedCategoryName = categoryName
         }
+    }
+}
+
+// MARK: - Extension
+extension LocationDetailViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    // Image Picker methods
+    func takePhotoWithCamera() {
+        let imagePicker = UIImagePickerController()
+        imagePicker.sourceType = .camera
+        imagePicker.delegate = self
+        imagePicker.allowsEditing = true
+        present(imagePicker, animated: true)
+    }
+
+    func choosePhotoFromLibrary() {
+        let imagePicker = UIImagePickerController()
+        imagePicker.sourceType = .photoLibrary
+        imagePicker.delegate = self
+        imagePicker.allowsEditing = true
+        present(imagePicker, animated: true)
+    }
+
+    // Image Picker delegates
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+        image = info[UIImagePickerController.InfoKey.editedImage] as? UIImage
+        if let theImage = image {
+            show(image: theImage)
+        }
+    
+        dismiss(animated: true)
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        dismiss(animated: true)
+    }
+    
+    // pickePhoto ActionSheet
+    func pickePhoto() {
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            showPhotoMenu()
+        } else {
+            choosePhotoFromLibrary()
+        }
+    }
+    
+    func showPhotoMenu() {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        let photoAction = UIAlertAction(title: "Take Photo", style: .default) { _ in
+            self.takePhotoWithCamera()
+        }
+        let libraryAction = UIAlertAction(title: "Choose From Library", style: .default) { _ in
+            self.choosePhotoFromLibrary()
+        }
+        alert.addAction(cancelAction)
+        alert.addAction(photoAction)
+        alert.addAction(libraryAction)
+        
+        present(alert, animated: true)
     }
 }

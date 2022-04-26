@@ -9,7 +9,7 @@ import UIKit
 import CoreData
 import CoreLocation
 
-class LocationsViewController: UITableViewController, NSFetchedResultsControllerDelegate {
+class LocationsViewController: UITableViewController {    
     // 数据库接口传入点（An object space to manipulate and track changes to managed objects.）
     var managedObjectContext: NSManagedObjectContext!
     // 懒加载控制器
@@ -74,6 +74,7 @@ class LocationsViewController: UITableViewController, NSFetchedResultsController
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             let location = fetchedResultsController.object(at: indexPath)
+            location.removePhotoFile()
             managedObjectContext.delete(location)
             do {
                 try managedObjectContext.save()
@@ -108,7 +109,7 @@ class LocationsViewController: UITableViewController, NSFetchedResultsController
 
 // MARK: - NSFetchedResultsController Delegate Extension
 // 这个Delegate用来观察NSFetchedResultsController是否发生了改变，如果有——>更新tableView
-extension LocationsViewController {
+extension LocationsViewController: NSFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
         print("*** controllerWillChangeContent ***")
         tableView.beginUpdates()

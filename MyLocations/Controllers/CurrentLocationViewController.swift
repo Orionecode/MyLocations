@@ -26,6 +26,17 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
     var timer: Timer?
     // core data 管理器
     var managedObjectContext: NSManagedObjectContext!
+    // logo
+    var logoVisible = false
+    lazy var logoButton: UIButton = {
+        let button = UIButton(type: .custom)
+        button.setBackgroundImage(UIImage(named: "Logo"), for: .normal)
+        button.sizeToFit()
+        button.addTarget(self, action: #selector(getLocation), for: .touchUpInside)
+        button.center.x = self.view.bounds.midX
+        button.center.y = self.view.bounds.midY - 60
+        return button
+    }()
 
     @IBOutlet weak var messageLabel: UILabel!
     @IBOutlet weak var latitudeLabel: UILabel!
@@ -33,6 +44,7 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
     @IBOutlet weak var addressLabel: UILabel!
     @IBOutlet weak var tagButton: UIButton!
     @IBOutlet weak var getButton: UIButton!
+    @IBOutlet weak var containerView: UIView!
 
     @IBAction func getLocation() {
         let authStaus = locationManager.authorizationStatus
@@ -45,6 +57,8 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
             showLocationServiceDeniedError()
             return
         }
+
+        hideLogoView()
 
         if updatingLocation {
             stopLocationManager()
@@ -61,13 +75,13 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
         super.viewDidLoad()
         updateLabels()
     }
-    
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         // 这个设定是全局设定，设定后会隐藏后续界面的NavigationBar
-        navigationController?.isNavigationBarHidden = true
+//        navigationController?.isNavigationBarHidden = true
     }
-    
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         // 更改回显示NavigationBar
@@ -153,11 +167,27 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
         present(alert, animated: true, completion: nil)
     }
 
+    func showLogoView() {
+        if !logoVisible {
+            logoVisible = true
+            containerView.isHidden = true
+            view.addSubview(logoButton)
+        }
+    }
+
+    func hideLogoView() {
+        logoVisible = false
+        containerView.isHidden = false
+        logoButton.removeFromSuperview()
+    }
+
     func updateLabels() {
         if let location = location {
             latitudeLabel.text = String(format: "%.8f", location.coordinate.latitude)
             longitudeLabel.text = String(format: "%.8f", location.coordinate.longitude)
             tagButton.isHidden = false
+            latitudeLabel.isHidden = false
+            longitudeLabel.isHidden = false
             messageLabel.text = "";
 
             if let placemark = placemark {
@@ -170,6 +200,8 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
                 addressLabel.text = "No Address Found"
             }
         } else {
+            latitudeLabel.isHidden = true
+            longitudeLabel.isHidden = true
             latitudeLabel.text = ""
             longitudeLabel.text = ""
             addressLabel.text = ""
@@ -186,7 +218,8 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
             } else if updatingLocation {
                 stausMessage = "Searching..."
             } else {
-                stausMessage = "Tap 'Get My Location' to Start"
+                stausMessage = ""
+                showLogoView()
             }
             messageLabel.text = stausMessage
         }
@@ -197,7 +230,7 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
         if updatingLocation {
             getButton.setTitle("Stop", for: .normal)
         } else {
-            getButton.setTitle("Get My Location", for: .normal)
+            getButton.setTitle("Tap to Get Location", for: .normal)
         }
     }
 
@@ -208,8 +241,8 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
             locationManager.startUpdatingLocation()
             updatingLocation = true
         }
-        
-        // 开始计时
+
+        // 开始计时 改了60
         timer = Timer.scheduledTimer(timeInterval: 60, target: self, selector: #selector(didTimeOut), userInfo: nil, repeats: false)
     }
 
@@ -219,13 +252,13 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
             locationManager.delegate = nil
             updatingLocation = false
         }
-        
+
         if let timer = timer {
             // 重置计时器
             timer.invalidate()
         }
     }
-    
+
     // 利用Objective C的Runtime机制
     @objc func didTimeOut() {
         print("*** Time Out ***")
@@ -263,7 +296,7 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
         // 5
         return line1 + "\n" + line2
     }
-    
+
     // MARK: - Navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "TagLocation" {
